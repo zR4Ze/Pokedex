@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokédex - 1. Generation</title>
+  <style>
+    :root {
+      --bg-color: #cceaff;
+      --card-color: #559dd8;
+      --text-color: #222222;
+    }
+    body.dark-mode {
+      --bg-color: #1e1e1e;
+      --card-color: #333;
+      --text-color: #eee;
+    }
+    body {
+      background-color: var(--bg-color);
+      font-family: 'Press Start 2P', sans-serif;
+      margin: 0;
+      padding: 0;
+      color: var(--text-color);
+    }
+    #controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      padding: 20px;
+      flex-wrap: wrap;
+    }
+    #search {
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 2px solid var(--card-color);
+      width: 300px;
+      max-width: 80%;
+      text-align: center;
+    }
+    #toggle-darkmode {
+      padding: 12px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 12px;
+      border: none;
+      background-color: var(--card-color);
+      color: var(--text-color);
+    }
+    #pokedex {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      padding: 20px;
+    }
+    .pokemon-card {
+      background: var(--card-color);
+      border-radius: 15px;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .pokemon-card:hover {
+      transform: scale(1.05);
+    }
+    .pokemon-card img {
+      width: 80px;
+    }
+    #modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #modalContent {
+      background: var(--bg-color);
+      border-radius: 20px;
+      padding: 20px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      position: relative;
+      animation: zoom 0.3s ease;
+      color: var(--text-color);
+    }
+    .close-btn {
+      position: absolute;
+      top: -15px;
+      right: -15px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .type-icons img {
+      width: 30px;
+      margin: 5px;
+    }
+    .evolution img {
+      width: 60px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .trainer-popup {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .trainer-popup img {
+      width: 150px;
+    }
+    .thought-bubble {
+      margin-top: 15px;
+      background: white;
+      padding: 10px;
+      border-radius: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      max-width: 90%;
+      font-size: 12px;
+      color: black;
+    }
+    @keyframes zoom {
+      0% {transform: scale(0.7); opacity: 0;}
+      100% {transform: scale(1); opacity: 1;}
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <input type="text" id="search" placeholder="Suche Pokémon">
+    <button id="toggle-darkmode">🌙</button>
+  </div>
+  <div id="pokedex"></div>
+  <div id="modal">
+    <div id="modalContent"></div>
+  </div>
+  <script>
+    const pokedex = document.getElementById("pokedex");
+    const searchInput = document.getElementById("search");
+    const modal = document.getElementById("modal");
+    const modalContent = document.getElementById("modalContent");
+
+    document.getElementById("toggle-darkmode").addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+    });
+
+    const evolutionMap = {
+      1: [1, 2, 3],
+      4: [4, 5, 6],
+      7: [7, 8, 9],
+      133: [133, 134, 135, 136]
+    };
+
+    const nameMap = {
+      bulbasaur: "Bisasam",
+      ivysaur: "Bisaknosp",
+      venusaur: "Bisaflor",
+      charmander: "Glumanda",
+      charmeleon: "Glutexo",
+      charizard: "Glurak",
+      squirtle: "Schiggy",
+      wartortle: "Schillok",
+      blastoise: "Turtok",
+      eevee: "Evoli",
+      vaporeon: "Aquana",
+      jolteon: "Blitza",
+      flareon: "Flamara"
+    };
+
+    async function fetchPokemon() {
+      for (let i = 1; i <= 151; i++) {
+        const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
+        const data = await res.json();
+
+        const card = document.createElement("div");
+        card.className = "pokemon-card";
+        card.innerHTML = `
+          <img src="${data.sprites.front_default}" alt="${data.name}">
+          <p>${nameMap[data.name] || data.name}</p>
+        `;
+
+        card.addEventListener("click", () => showModal(data));
+        pokedex.appendChild(card);
+      }
+    }
+
+    async function showModal(pokemon) {
+      modal.style.display = "flex";
+      const evoIds = evolutionMap[pokemon.id] || [pokemon.id];
+      const evoImage = await Promise.all(evoIds.map(async id => {
+        const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+        const data = await res.json();
+        return `<img src='${data.sprites.front_default}' alt='${data.name}' onclick='showTrainer(${data.id})'>`;
+      }));
+
+      modalContent.innerHTML = `
+        <button class="close-btn" onclick="modal.style.display='none'">&times;</button>
+        <img src="${pokemon.sprites.other["official-artwork"].front_default}" style="width:150px"><br>
+        <h3>${nameMap[pokemon.name] || pokemon.name} <br>#${pokemon.id}</h3>
+        <div class="type-icons">
+          ${pokemon.types.map(t => `<img src="https://raw.githubusercontent.com/duiker101/pokemon-type-svg-icons/master/icons/${t.type.name}.svg" title="${t.type.name}">`).join('')}
+        </div>
+        <h4>Stärken:</h4>
+        <div>${getStrengths(pokemon.types.map(t => t.type.name)).join(', ')}</div>
+        <h4>Entwicklung:</h4>
+        <div class='evolution'>${evoImage.join('')}</div>
+      `;
+    }
+
+    function showTrainer(pokemonId) {
+      if (pokemonId === 4) {
+        modalContent.innerHTML = `
+          <button class="close-btn" onclick="modal.style.display='none'">&times;</button>
+          <div class="trainer-popup">
+            <img src="https://img.pokemondb.net/sprites/black-white/anim/normal/voltorb.gif" alt="Voltobal">
+            <div class="thought-bubble">
+              Du hast Glumanda gewählt wie der Entwickler. Glückwunsch!
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.toLowerCase();
+      const cards = document.querySelectorAll(".pokemon-card");
+      if (["rainer", "sparky", "pyro"].includes(query)) {
+        fetchEeveeEvolution(query);
+      } else {
+        cards.forEach(card => {
+          const name = card.textContent.toLowerCase();
+          card.style.display = name.includes(query) ? "block" : "none";
+        });
+      }
+    });
+
+    async function fetchEeveeEvolution(name) {
+      const map = {
+        rainer: 134,
+        sparky: 135,
+        pyro: 136
+      };
+      const id = map[name];
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+      const data = await res.json();
+      pokedex.innerHTML = "";
+      const card = document.createElement("div");
+      card.className = "pokemon-card";
+      card.innerHTML = `
+        <img src="${data.sprites.front_default}" alt="${data.name}">
+        <p>${nameMap[data.name] || data.name}</p>
+      `;
+      card.addEventListener("click", () => showModal(data));
+      pokedex.appendChild(card);
+    }
+
+    function getStrengths(types) {
+      const typeAdvantages = {
+        normal: [],
+        fire: ["grass", "ice", "bug", "steel"],
+        water: ["fire", "ground", "rock"],
+        electric: ["water", "flying"],
+        grass: ["water", "ground", "rock"],
+        ice: ["grass", "ground", "flying", "dragon"],
+        fighting: ["normal", "ice", "rock", "dark", "steel"],
+        poison: ["grass", "fairy"],
+        ground: ["fire", "electric", "poison", "rock", "steel"],
+        flying: ["grass", "fighting", "bug"],
+        psychic: ["fighting", "poison"],
+        bug: ["grass", "psychic", "dark"],
+        rock: ["fire", "ice", "flying", "bug"],
+        ghost: ["psychic", "ghost"],
+        dragon: ["dragon"],
+        dark: ["psychic", "ghost"],
+        steel: ["ice", "rock", "fairy"],
+        fairy: ["fighting", "dragon", "dark"]
+      };
+      const strengths = new Set();
+      types.forEach(type => {
+        if (typeAdvantages[type]) {
+          typeAdvantages[type].forEach(str => strengths.add(str));
+        }
+      });
+      return Array.from(strengths);
+    }
+
+    fetchPokemon();
+  </script>
+</body>
+</html>
